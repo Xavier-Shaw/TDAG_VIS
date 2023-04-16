@@ -17,6 +17,7 @@
 
     <h2>Draggable Chart For User</h2>
     <svg id="draggableChart"></svg>
+    <el-button type="primary" @click="checkOverlap">Submit My Modification</el-button>
   </div>
 </template>
 
@@ -27,6 +28,7 @@ import {createILP} from "@/utils/ILP";
 import {calScore} from "@/utils/scoreCalculation";
 import * as d3 from "d3";
 import axios from "axios";
+import {ElMessageBox} from "element-plus";
 // import DraggableChart from "@/components/draggableChart";
 // import draggable from 'vuedraggable'
 
@@ -48,7 +50,7 @@ export default {
       graph: null,
       currentMoveItem: null,
       nodeYDistance: 30,
-      layersY: []
+      nodeLayerMap: {},
     }
   },
 
@@ -171,6 +173,8 @@ export default {
 
           if (node.realNode !== null) {
             if (node.realNode.startVirtualNode === node) {
+              _this.nodeLayerMap[node.realNode.id] = _this.graph.virtualNodeIndex[depth].indexOf(node);
+
               svg.append('rect')
                   .attr("class", "dragRect")
                   .attr("id", node.realNode.id)
@@ -211,8 +215,6 @@ export default {
       }
 
       function dragged(e) {
-        console.log(e, 'drag log....');
-
         const currentY = e.y;
 
         d3.select(this)
@@ -223,11 +225,10 @@ export default {
       }
 
       function dragEnded(e) { // drag end
-        console.log('end log....', e)
-
         // fit to the nearest layer
         let prevDistance = Math.abs(e.y - _this.graph.paddingY);
         let finalY = _this.graph.paddingY
+        _this.nodeLayerMap[this.id] = 0;
         for (let i = 1; i < _this.graph.virtualNodeIndex[0].length; i++) {
           let nowDistance = Math.abs(e.y - (_this.graph.paddingY + i * _this.nodeYDistance));
           if (nowDistance > prevDistance) {
@@ -236,6 +237,7 @@ export default {
           else {
             prevDistance = nowDistance;
             finalY = _this.graph.paddingY + i * _this.nodeYDistance
+            _this.nodeLayerMap[this.id] = i;
           }
         }
 
@@ -245,8 +247,6 @@ export default {
         d3.select("#text_" + this.id)
             .attr("y", finalY - 3)
 
-        console.log(this)
-        console.log(this.id)
         _this.afterMoveNode(this.id, finalY)
       }
 
@@ -258,7 +258,6 @@ export default {
 
     afterMoveNode(id, y) {
       let _this = this;
-      console.log(this.graph.nodes)
       let movedNode = this.graph.nodes.find(e => e.id === parseInt(id))
 
       let edgeToNode = movedNode.startVirtualNode.inVirtualEdges;
@@ -284,7 +283,27 @@ export default {
               ])
             })
       }
+    },
 
+    checkOverlap() {
+      for (let i = 0; i < this.graph.nodes.length; i++) {
+        let node_1 = this.graph.nodes[i];
+        for (let j = i + 1; j < this.graph.nodes.length; j++) {
+          let node_2 = this.graph.nodes[j];
+          let overlap_x = (node_2.startTime <= node_1.startTime && node_1.startTime < node_2.endTime)
+              || (node_1.startTime <= node_2.startTime && node_2.startTime < node_1.endTime);
+          let overlap_y = (this.nodeLayerMap[node_1.id] === this.nodeLayerMap[node_2.id]);
+          if (overlap_x && overlap_y) {
+            let message = "Node " + node_1.id + " and Node " + node_2.id + " are overlapped.\n" + "Please avoid overlapping nodes."
+            ElMessageBox.alert(message, 'Modification Failed', {
+              // if you want to disable its autofocus
+              // autofocus: false,
+              confirmButtonText: 'OK',
+            })
+            break;
+          }
+        }
+      }
     }
   },
 
