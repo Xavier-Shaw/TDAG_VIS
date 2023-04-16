@@ -1,15 +1,14 @@
 <template>
-  <img alt="Vue logo" src="./assets/logo.png">
-  <HelloWorld msg="Welcome to Your Vue.js App"/>
+  <gantt-graph></gantt-graph>
 </template>
 
 <script>
-import HelloWorld from './components/HelloWorld.vue'
+import GanttGraph from "@/components/ganttGraph";
 
 export default {
   name: 'App',
   components: {
-    HelloWorld
+    GanttGraph
   }
 }
 </script>
