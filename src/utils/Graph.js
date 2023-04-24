@@ -32,8 +32,6 @@ export default class Graph {
     /** @type {Map<string, Edge>} */
     edgeMap = new Map()
 
-    rowNodeIndex = [[], [], [], [], [], [], [], [], [], [], []]
-
     /** @type {Tick[]} */
     ticks = []
 
@@ -52,8 +50,6 @@ export default class Graph {
     virtualNodeIndex = []
 
     groups = []
-
-    output_json_map = {nodes: [], edges: [], groups: []}
 
     constructor() {
     }
@@ -268,24 +264,6 @@ export default class Graph {
         this.createGroups()
 
         this.createSpaceAnchors()
-
-        for (let virtualNode of this.virtualNodes) {
-            this.output_json_map.nodes.push({id: 'u' + virtualNode.id})
-        }
-
-        for (let virtualEdge of this.virtualEdges) {
-            this.output_json_map.edges.push({nodes: ['u' + virtualEdge.startVirtualNode.id, 'u' + virtualEdge.endVirtualNode.id]})
-        }
-
-        for (let group of this.groups) {
-            let groupNodes = []
-            for (let node of group) {
-                groupNodes.push('u' + node.id)
-            }
-            this.output_json_map.groups.push({nodes: groupNodes})
-        }
-
-        console.log(JSON.stringify(this.output_json_map))
     }
 
     addLevelsToNodeIndex(depth) {

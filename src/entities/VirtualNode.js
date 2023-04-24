@@ -24,6 +24,8 @@ export default class VirtualNode {
     /** @type {number} */
     groupID
 
+    userLayer
+
     edgeAnchorNodes = []
 
     constructor(id, positionX, tickRank, realNode) {

@@ -9,11 +9,6 @@ export default class ILP {
         this.zcount = 0
         this.initialGuess = {}
         this.m = 50
-
-        this.minimizeString = "Minimize\n"
-        this.subjectString = "Subject To\n"
-        this.binaryString = "Binaries\n"
-        this.modelString = ""
         this.result = {}
 
         this.options = {
@@ -22,6 +17,14 @@ export default class ILP {
             bendiness_reduction_weight: 1,
             bendiness_reduction_active: true,
         };
+    }
+
+    setCrossingWeight(weight) {
+        this.options.crossings_reduction_weight = weight;
+    }
+
+    setBendinessWeight(weight) {
+        this.options.bendiness_reduction_weight = weight;
     }
 
     makeCrossingVariable(u1, w1, u2, w2) {
@@ -57,7 +60,6 @@ export default class ILP {
     addCrossingsToMinimize() {
         for (let elem in this.crossing_vars) {
             this.model.minimize += this.options.crossings_reduction_weight + " " + elem + " + "
-            this.minimizeString += this.options.crossings_reduction_weight + " " + elem + " + "
         }
     }
 
@@ -91,15 +93,8 @@ export default class ILP {
 
                     // C_u1v1_u2v2 + x_u1_u2 + x_v2_v1 >= 1
                     this.model.subjectTo += crossing + " + " + this.makeBasicVariable(u1, u2) + " + " + this.makeBasicVariable(v2, v1) + " >= 1\n"
-                    this.subjectString += crossing + " + " + this.makeBasicVariable(u1, u2) + " + " + this.makeBasicVariable(v2, v1) + " >= 1\n"
                     // C_u1v1_u2v2 + x_u2_u1 + x_v1_v2 >= 1
                     this.model.subjectTo += crossing + " + " + this.makeBasicVariable(u2, u1) + " + " + this.makeBasicVariable(v1, v2) + " >= 1\n"
-                    this.subjectString += crossing + " + " + this.makeBasicVariable(u2, u1) + " + " + this.makeBasicVariable(v1, v2) + " >= 1\n"
-
-                    let t1 = 1 - this.initialGuess[this.makeBasicVariable(u1, u2)] - this.initialGuess[this.makeBasicVariable(v2, v1)]
-                    let t2 = 1 - this.initialGuess[this.makeBasicVariable(u2, u1)] - this.initialGuess[this.makeBasicVariable(v1, v2)]
-
-                    this.initialGuess[crossing] = Math.max(t1, t2)
                 }
             }
         }
@@ -108,7 +103,6 @@ export default class ILP {
     addCurvatureToMinimize() {
         for (let elem in this.bend_vars) {
             this.model.minimize += this.options.bendiness_reduction_weight + " " + elem + " + "
-            this.minimizeString += this.options.bendiness_reduction_weight + " " + elem + " + "
         }
     }
 
@@ -130,15 +124,8 @@ export default class ILP {
         let z = this.makeCurveVariable(u1, v1)
 
         this.model.subjectTo += y1 + " - " + y2 + " - " + z + " <= 0\n"
-        this.subjectString += y1 + " - " + y2 + " - " + z + " <= 0\n"
-
         this.model.subjectTo += y2 + " - " + y1 + " - " + z + " <= 0\n"
-        this.subjectString += y2 + " - " + y1 + " - " + z + " <= 0\n"
-
         this.model.subjectTo += z + " >= 0\n"
-        this.subjectString += z + " >= 0\n"
-
-        this.initialGuess[z] = Math.abs(this.initialGuess[y1] - this.initialGuess[y2])
     }
 
     addGroupToSubjectTo() {
@@ -155,12 +142,10 @@ export default class ILP {
                 let startIdx = j + 1
                 if (!isAnchor && !isEdgeAnchor) {
                     info = this.makeGroupVariable(curNode.groupID)
-                    this.initialGuess[info] = j
                     startIdx = 0
                 }
                 else if (isEdgeAnchor) {
                     info = this.makeGroupVariable(curNode.id)
-                    this.initialGuess[info] = j
                     startIdx = 0
                 }
 
@@ -172,13 +157,10 @@ export default class ILP {
                     }
                     this.model.subjectTo += this.makeBasicVariable(curNode, nextNode) + " + "
                         + this.makeBasicVariable(nextNode, curNode) + " = 1\n"
-                    this.subjectString += this.makeBasicVariable(curNode, nextNode) + " + "
-                        + this.makeBasicVariable(nextNode, curNode) + " = 1\n"
                 }
 
                 if (!isAnchor) {
                     this.model.subjectTo += info + " = 0\n"
-                    this.subjectString += info + " = 0\n"
                 }
             }
         }
@@ -193,22 +175,12 @@ export default class ILP {
                 for (let k = j + 1; k < layerNodes.length; k++) {
                     let node_2 = layerNodes[k]
 
-                    this.initialGuess[this.makeBasicVariable(node_1, node_2)] = 0
-                    this.initialGuess[this.makeBasicVariable(node_2, node_1)] = 1
-
                     for (let p = k + 1; p < layerNodes.length; p++) {
                         let node_3 = layerNodes[p]
                         this.model.subjectTo += this.makeBasicVariable(node_1, node_2) + " + "
                             + this.makeBasicVariable(node_2, node_3) + " - "
                             + this.makeBasicVariable(node_1, node_3) + " >= 0\n"
-                        this.subjectString += this.makeBasicVariable(node_1, node_2) + " + "
-                            + this.makeBasicVariable(node_2, node_3) + " - "
-                            + this.makeBasicVariable(node_1, node_3) + " >= 0\n"
-
                         this.model.subjectTo += "- " + this.makeBasicVariable(node_1, node_2) + " - "
-                            + this.makeBasicVariable(node_2, node_3) + " + "
-                            + this.makeBasicVariable(node_1, node_3) + " >= -1\n"
-                        this.subjectString += "- " + this.makeBasicVariable(node_1, node_2) + " - "
                             + this.makeBasicVariable(node_2, node_3) + " + "
                             + this.makeBasicVariable(node_1, node_3) + " >= -1\n"
                     }
@@ -219,16 +191,18 @@ export default class ILP {
 
     modelToString() {
         this.model.minimize = this.model.minimize.substring(0, this.model.minimize.length - 2) + "\n"
-        this.minimizeString = this.minimizeString.substring(0, this.minimizeString.length - 2) + "\n"
-
-        this.modelString = this.minimizeString + this.subjectString + this.binaryString + '\nEnd\n'
         return this.model.minimize + this.model.subjectTo + this.model.bounds + '\nEnd\n'
     }
 
     fillModel() {
+        this.minimizeString = "Minimize\n"
+        this.subjectString = "Subject To\n"
+        this.binaryString = "Binaries\n"
+        this.modelString = ""
+
         this.model.minimize = "Minimize \n"
         this.model.subjectTo = "Subject To \n"
-        this.model.bounds = "\nBounds \n"
+        this.model.bounds = "\nBinaries \n"
 
         this.crossing_vars = {}
         this.defined_vars = {}
@@ -243,18 +217,12 @@ export default class ILP {
         this.addCrossingsToMinimize()
         this.addCurvatureToMinimize()
 
-        // console.log("===========================")
-        // console.log(this.initialGuess)
-        // console.log("===========================")
-
         // add binary constraints to variables
         for (let elem in this.defined_vars) {
-            this.model.bounds += "binary " + elem + "\n"
-            this.binaryString += elem + " "
+            this.model.bounds += elem + " "
         }
         for (let elem in this.crossing_vars) {
-            this.model.bounds += "binary " + elem + "\n"
-            this.binaryString += elem + " "
+            this.model.bounds += elem + " "
         }
     }
 
@@ -272,14 +240,12 @@ export default class ILP {
     send_lp() {
         let BASE_ADDRESS = "http://127.0.0.1:5000/"
 
-        this.minimizeString = this.minimizeString.substring(0, this.minimizeString.length - 2) + "\n"
-        this.modelString = this.minimizeString + this.subjectString + this.binaryString + '\nEnd\n'
+        let modelString = this.modelToString();
+
         let _this = this
-        console.log("here")
-        console.log(this.modelString)
         return new Promise(resolve => {
             axios.post(BASE_ADDRESS + "saveFile", {
-                data: this.modelString,
+                data: modelString,
                 case: this.graph.caseName
             })
                 .then(function (response) {
