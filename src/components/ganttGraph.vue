@@ -38,7 +38,7 @@
 import {createGraph} from "@/utils/Graph";
 import {readGraphFromJSON} from "@/utils/readGraph"
 import {createILP} from "@/utils/ILP";
-import {calGurobiScore} from "@/utils/scoreCalculation";
+import {calBasicScore, calGurobiScore} from "@/utils/scoreCalculation";
 import * as d3 from "d3";
 import axios from "axios";
 import {ElMessageBox} from "element-plus";
@@ -390,21 +390,21 @@ export default {
       }
 
       // layout the virtual nodes of nodes to the position after modified
-      this.userGraph.nodes.forEach((node) => {
+      for (const node of this.userGraph.nodes) {
         let layer = this.nodeLayerMap[node.id];
-        node.virtualNodes.forEach((virtualNode) => {
+        for (const virtualNode of node.childVirtualNodes) {
           let index = virtualNode.tickRank;
           virtualNode.userLayer = layer;
           this.userGraph.virtualNodeIndex[index][layer] = virtualNode;
-        })
-      })
+        }
+      }
 
       // layout the edge anchor nodes to the position after modified
       let edgeAnchorNodes = this.userGraph.virtualNodes.filter((n) => n.nodeType === 'edge-anchor');
-      edgeAnchorNodes.forEach((edgeAnchorNode) => {
+      for (const edgeAnchorNode of edgeAnchorNodes) {
         let index = edgeAnchorNode.tickRank;
         this.userGraph.virtualNodeIndex[index][edgeAnchorNode.userLayer] = edgeAnchorNode;
-      })
+      }
 
       // fill the virtual nodes' matrix
       let anchorID = 0;
@@ -442,7 +442,8 @@ export default {
       this.checkNodeOverlap();
       this.checkNodeEdgeOverlap();
       this.getUserModifiedResult();
-
+      let scores = calBasicScore(this.userGraph);
+      d3.select("#Modified_score").text("Crossing Score: " + scores[0] + " / Curvature Score: " + scores[1]);
     }
   },
 
