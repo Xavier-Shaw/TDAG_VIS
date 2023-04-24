@@ -35,6 +35,9 @@ export default class Node {
     /** @type {number} */
     y
 
+    /** @type {number} */
+    groupID
+
     /**
      *
      * @param {(number|string)} id

@@ -28,33 +28,39 @@ export default class ILP {
     }
 
     makeCrossingVariable(u1, w1, u2, w2) {
-        let crossing_variable = "c_" + u1.id  + "_" + w1.id + "_" + u2.id + "_" + w2.id
-        this.crossing_vars[crossing_variable] = ""
-        return crossing_variable
+        let crossing_variable = "cross_" + u1.id  + "_" + w1.id + "_" + u2.id + "_" + w2.id;
+        this.crossing_vars[crossing_variable] = "";
+        return crossing_variable;
     }
 
     makeBasicVariable(u1, u2) {
-        let basic_var = "x_" + u1.id + "_" + u2.id
-        this.defined_vars[basic_var] = ""
-        return basic_var
+        let basic_var = "x_" + u1.id + "_" + u2.id;
+        this.defined_vars[basic_var] = "";
+        return basic_var;
     }
 
     makeGroupVariable(groupID) {
-        let variable = "g_" + groupID
-        this.group_vars[variable] = ""
-        return variable
+        let variable = "g_" + groupID;
+        this.group_vars[variable] = "";
+        return variable;
+    }
+
+    makeCompactnessVariable(n1, n2) {
+        let variable = "comp_g" + n1.groupID + "_g" + n2.groupID;
+        this.compact_vars[variable] = "";
+        return variable;
     }
 
     makeHeightVariable(node) {
-        let variable = "y_" + node.id
-        this.height_vars[variable] = ""
-        return variable
+        let variable = "y_" + node.id;
+        this.height_vars[variable] = "";
+        return variable;
     }
 
     makeCurveVariable(u1, v1) {
-        let variable = "z_" + u1.id + "_" + v1.id
-        this.bend_vars[variable] = ""
-        return variable
+        let variable = "z_" + u1.id + "_" + v1.id;
+        this.bend_vars[variable] = "";
+        return variable;
     }
 
     addCrossingsToMinimize() {
@@ -189,6 +195,31 @@ export default class ILP {
         }
     }
 
+    addCompactnessToSubjectTo() {
+        for (let i = 0; i < this.graph.nodes.length; i++) {
+            let node_1 = this.graph.nodes[i];
+            let startIndex_1 = node_1.startVirtualNode.tickRank;
+            let endIndex_1 = node_1.endVirtualNode.tickRank;
+            for (let j = i + 1; j < this.graph.nodes.length; j++) {
+                let node_2 = this.graph.nodes[j];
+                let startIndex_2 = node_2.startVirtualNode.tickRank;
+                let endIndex_2 = node_2.endVirtualNode.tickRank;
+                if (startIndex_1 <= startIndex_2 <= endIndex_1 || startIndex_1 <= endIndex_2 <= endIndex_1) {
+                    // comp_g1_g2 - g_1 + g_2 >= 0
+                    this.model.subjectTo += this.makeCompactnessVariable(node_1, node_2) + " - " +
+                        this.makeGroupVariable(node_1.groupID) + " + " + this.makeGroupVariable(node_2.groupID) + " >= 0\n";
+                    // comp_g1_g2 - g_2 + g_1 >= 0
+                    this.model.subjectTo += this.makeCompactnessVariable(node_1, node_2) + " - " +
+                        this.makeGroupVariable(node_2.groupID) + " + " + this.makeGroupVariable(node_1.groupID) + " >= 0\n";
+                }
+            }
+        }
+    }
+
+    addVerticalPositionToSubjectTo() {
+
+    }
+
     modelToString() {
         this.model.minimize = this.model.minimize.substring(0, this.model.minimize.length - 2) + "\n"
         return this.model.minimize + this.model.subjectTo + this.model.bounds + '\nEnd\n'
@@ -207,6 +238,7 @@ export default class ILP {
         this.crossing_vars = {}
         this.defined_vars = {}
         this.group_vars = {}
+        this.compact_vars = {}
         this.height_vars = {}
         this.bend_vars = {}
 

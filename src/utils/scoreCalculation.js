@@ -33,7 +33,7 @@ function calGurobiCrossingScore(graph, result) {
                     continue;
                 }
 
-                let crossing_variable = "c_" + u1.id  + "_" + v1.id + "_" + u2.id + "_" + v2.id;
+                let crossing_variable = "cross_" + u1.id  + "_" + v1.id + "_" + u2.id + "_" + v2.id;
                 let crossing_res = result[crossing_variable];
 
                 crossingScore += crossing_res;

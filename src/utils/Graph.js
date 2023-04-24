@@ -222,12 +222,13 @@ export default class Graph {
         // create group
         let num = 0
         this.nodes.forEach((node) => {
-            this.addLevelsToGroup(num)
+            this.addLevelsToGroup(num);
+            node.groupID = num;
             node.childVirtualNodes.forEach((vNode) => {
-                this.groups.at(num).push(vNode)
-                vNode.groupID = num
+                this.groups.at(num).push(vNode);
+                vNode.groupID = num;
             })
-            num++
+            num++;
         })
     }
 
