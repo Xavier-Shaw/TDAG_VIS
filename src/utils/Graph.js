@@ -491,7 +491,7 @@ export default class Graph {
         if (rect) outer_color = '#1c1717'
 
         let edge_colors = {'inner': '#6b6e79', 'outer': outer_color, 'fake': '#ec7430'};
-        let node_colors = {'inner': '#656262', 'side': '#1e1b1b', 'edge-anchor': '#9572b2', 'anchor': '#96919a'}
+        let node_colors = {'inner': '#656262', 'side': '#1e1b1b', 'edge-anchor': '#e530c7', 'anchor': '#96919a'}
 
         for (let edge of this.virtualEdges) {
             svg.append('path')
@@ -514,40 +514,59 @@ export default class Graph {
         for (let depth in this.virtualNodeIndex) {
             for (let node of this.virtualNodeIndex[depth]) {
 
-                if ((node.nodeType === 'anchor' || node.nodeType === 'edge-anchor') && rect) continue
                 let g = svg.append('g')
                     .attr('transform', 'translate(' + (getNodeCoordX(node)) + ',' + getNodeCoordY(node) + ')')
 
-                if (node.realNode !== null && rect) {
-                    if (node.realNode.startVirtualNode === node) {
-                        g.append('rect')
-                            .attr('width', this.xScale(node.realNode.endTime) - this.xScale(node.realNode.startTime))
-                            .attr("y", -5)
-                            .attr('height', 15)
-                            .style('fill', this.color(this.nodes.indexOf(node.realNode)))
-                            .append('title')
-                            .text(node.realNode.id)
+                if (rect) {
+                    if (node.nodeType === 'edge-anchor') {
+                        g.append('circle')
+                            .attr('class', 'node')
+                            // .attr('fill', '#ccc')
+                            // .attr('stroke', 'black')
+                            // .attr('stroke-width', 2)
+                            .attr('r', 5)
+                            .attr('cx', 0)
+                            .attr('cy', 0)
+                            // .attr('stroke', '#303E3F')
+                            .attr('stroke-width', 0)
+                            .attr('fill', node_colors[node.nodeType])
+
+                        g.append('text')
+                            .text(node.id)
+                            .attr('text-anchor', 'middle')
+                            .style("font-family", "Arial")
+                            .attr('x', 3)
+                            .attr('y', -5)
+                            .attr('fill', '#1e1b1b')
+                            .style('font-size', '0.7em')
+                            .style("font-weight", "bold")
+                    }
+                    else if (node.realNode !== null) { // not anchor
+                        if (node.realNode.startVirtualNode === node) {
+                            g.append('rect')
+                                .attr('width', this.xScale(node.realNode.endTime) - this.xScale(node.realNode.startTime))
+                                .attr("y", -5)
+                                .attr('height', 15)
+                                .style('fill', this.color(this.nodes.indexOf(node.realNode)))
+                                .append('title')
+                                .text(node.realNode.id)
+
+                            let text = node.realNode.name.replace('Map ', 'M')
+                            text = text.replace('Reducer ', 'R')
+                            g.append('text')
+                                .text(text)
+                                .attr('text-anchor', 'middle')
+                                .style("font-family", "Arial")
+                                .attr('x', 3)
+                                .attr('y', -5)
+                                .attr('fill', '#1e1b1b')
+                                .style('font-size', '0.7em')
+                                .style("font-weight", "bold")
+                        }
                     }
                 }
-
-                if (rect && node === node.realNode.startVirtualNode) {
-
-                    let text = node.realNode.name.replace('Map ', 'M')
-                    text = text.replace('Reducer ', 'R')
-                    g.append('text')
-                        .text(text)
-                        .attr('text-anchor', 'middle')
-                        .style("font-family", "Arial")
-                        .attr('x', 3)
-                        .attr('y', -5)
-                        .attr('fill', '#1e1b1b')
-                        .style('font-size', '0.7em')
-                        .style("font-weight", "bold")
-                }
-
-                if (!rect) {
+                else {
                     g.append('circle')
-                        .datum(node)
                         .attr('class', 'node')
                         // .attr('fill', '#ccc')
                         // .attr('stroke', 'black')

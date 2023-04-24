@@ -38,7 +38,7 @@
 import {createGraph} from "@/utils/Graph";
 import {readGraphFromJSON} from "@/utils/readGraph"
 import {createILP} from "@/utils/ILP";
-import {calScore} from "@/utils/scoreCalculation";
+import {calGurobiScore} from "@/utils/scoreCalculation";
 import * as d3 from "d3";
 import axios from "axios";
 import {ElMessageBox} from "element-plus";
@@ -126,7 +126,7 @@ export default {
             this.graph.draw(svg_gantt, 30, true);
             let ilpEndTime = new Date();
             d3.select("#ILP_time").text("ILP Time:" + (ilpEndTime - ilpStartTime) / 1000 + 's');
-            let scores = calScore(this.graph, this.solver.result);
+            let scores = calGurobiScore(this.graph, this.solver.result);
             d3.select("#ILP_score").text("Crossing Score: " + scores[0] + " / Curvature Score: " + scores[1]);
             this.createUserGraph();
             this.drawDraggableChart();
@@ -176,8 +176,8 @@ export default {
           .attr("height", this.userGraph.greedy_canvas_height)
 
       let line = d3.line().curve(d3.curveBasis);
-      let outer_color = '#1c1717'
-      let color = d3.scaleOrdinal(d3.schemeCategory10)
+      let outer_color = '#1c1717';
+      let node_colors = {'inner': '#656262', 'side': '#1e1b1b', 'edge-anchor': '#e530c7', 'anchor': '#96919a'}
       let edge_colors = {'inner': '#6b6e79', 'outer': outer_color, 'fake': '#ec7430'};
 
       for (let edge of this.userGraph.virtualEdges) {
@@ -207,21 +207,41 @@ export default {
       for (let depth in this.userGraph.virtualNodeIndex) {
         for (let node of this.userGraph.virtualNodeIndex[depth]) {
 
-          if ((node.nodeType === 'anchor' || node.nodeType === 'edge-anchor')) continue
+          if (node.nodeType === 'edge-anchor') {
+            node.userLayer = _this.userGraph.virtualNodeIndex[depth].indexOf(node);
+            svg.append('circle')
+                .attr('class', 'draggableItem')
+                .attr("id", node.id)
+                .attr('r', 5)
+                .attr('cx', _this.getNodeCoordX(node))
+                .attr('cy', _this.getNodeCoordY(node) + _this.userGraph.bar_height / 2)
+                .attr('stroke-width', 0)
+                .attr('fill', node_colors[node.nodeType])
 
-          if (node.realNode !== null) {
+            svg.append('text')
+                .attr("id", "text_" + node.id)
+                .text(node.id)
+                .attr('text-anchor', 'middle')
+                .style("font-family", "Arial")
+                .attr('x', _this.getNodeCoordX(node) + 3)
+                .attr('y', _this.getNodeCoordY(node)  + _this.userGraph.bar_height / 2 - 3)
+                .attr('fill', '#1e1b1b')
+                .style('font-size', '0.7em')
+                .style("font-weight", "bold")
+          }
+          else if (node.realNode !== null) { // not anchor
             if (node.realNode.startVirtualNode === node) {
               node.userLayer = _this.userGraph.virtualNodeIndex[depth].indexOf(node);
               _this.nodeLayerMap[node.realNode.id] = node.userLayer;
 
               svg.append('rect')
-                  .attr("class", "dragRect")
+                  .attr("class", "draggableItem")
                   .attr("id", node.realNode.id)
                   .attr('width', this.userGraph.xScale(node.realNode.endTime) - this.userGraph.xScale(node.realNode.startTime))
                   .attr("x", _this.getNodeCoordX(node))
                   .attr("y", _this.getNodeCoordY(node))
                   .attr('height', _this.userGraph.bar_height)
-                  .style('fill', color(this.userGraph.nodes.indexOf(node.realNode)))
+                  .style('fill', this.userGraph.color(this.userGraph.nodes.indexOf(node.realNode)))
                   .append('title')
                   .text(node.realNode.id)
 
@@ -242,11 +262,11 @@ export default {
         }
       }
 
-      d3.selectAll(".dragRect")
-          .call(_this.dragRect())
+      d3.selectAll(".draggableItem")
+          .call(_this.dragItem())
     },
 
-    dragRect() {
+    dragItem() {
       let _this = this;
 
       function dragStarted() {
@@ -254,20 +274,24 @@ export default {
       }
 
       function dragged(e) {
+        let isEdgeAnchor = this.id.startsWith("ea");
+        const attributeY = isEdgeAnchor? "cy": "y";
         const currentY = e.y;
 
         d3.select(this)
-            .attr("y", currentY)
+            .attr(attributeY, currentY)
 
         d3.select("#text_" + this.id)
             .attr("y", currentY - 3)
       }
 
       function dragEnded(e) { // drag end
+        let isEdgeAnchor = this.id.startsWith("ea");
         // fit to the nearest layer
         let prevDistance = Math.abs(e.y - _this.userGraph.paddingY);
-        let finalY = _this.userGraph.paddingY
+        let finalY = _this.userGraph.paddingY;
         _this.nodeLayerMap[this.id] = 0;
+
         for (let i = 1; i < _this.userGraph.virtualNodeIndex[0].length; i++) {
           let nowDistance = Math.abs(e.y - (_this.userGraph.paddingY + i * _this.nodeYDistance));
           if (nowDistance > prevDistance) {
@@ -279,13 +303,15 @@ export default {
           }
         }
 
+        const attributeY = isEdgeAnchor? "cy": "y";
+        const deltaY = isEdgeAnchor? _this.userGraph.bar_height / 2: 0;
         d3.select(this)
-            .attr("y", finalY)
+            .attr(attributeY, finalY + deltaY)
 
         d3.select("#text_" + this.id)
-            .attr("y", finalY - 3)
+            .attr("y", finalY + deltaY - 3)
 
-        _this.afterMoveNode(this.id, finalY)
+        _this.afterMoveNode(this.id, isEdgeAnchor, finalY);
       }
 
       return d3.drag()
@@ -294,21 +320,30 @@ export default {
           .on('end', dragEnded); // 结束
     },
 
-    afterMoveNode(id, y) {
+    afterMoveNode(id, isEdgeAnchor, y) {
       let _this = this;
-      let movedNode = this.userGraph.nodes.find(e => e.id === parseInt(id))
-      movedNode.startVirtualNode.userLayer = this.nodeLayerMap[id];
-      movedNode.endVirtualNode.userLayer = this.nodeLayerMap[id];
-      let edgeToNode = movedNode.startVirtualNode.inVirtualEdges;
-      let edgeFromNode = movedNode.endVirtualNode.outVirtualEdges;
-      let line = d3.line().curve(d3.curveBasis);
+      let edgeToNode, edgeFromNode;
+      if (isEdgeAnchor) {
+        let movedNode = this.userGraph.virtualNodes.find(e => e.id === id);
+        edgeToNode = movedNode.inVirtualEdges;
+        edgeFromNode = movedNode.outVirtualEdges;
+        movedNode.userLayer = this.nodeLayerMap[id];
+      }
+      else {
+        let movedNode = this.userGraph.nodes.find(e => e.id === parseInt(id))
+        movedNode.startVirtualNode.userLayer = this.nodeLayerMap[id];
+        movedNode.endVirtualNode.userLayer = this.nodeLayerMap[id];
+        edgeToNode = movedNode.startVirtualNode.inVirtualEdges;
+        edgeFromNode = movedNode.endVirtualNode.outVirtualEdges;
+      }
 
+      let line = d3.line().curve(d3.curveBasis);
       for (const edge of edgeToNode) {
         d3.select("#edge_" + edge.startVirtualNode.id + "-" + edge.endVirtualNode.id)
             .attr('d', () => {
               return line([
-                [_this.getNodeCoordX(edge.startVirtualNode), _this.getNodeCoordY(edge.startVirtualNode) + _this.graph.bar_height / 2],
-                [_this.getNodeCoordX(edge.endVirtualNode), y + _this.graph.bar_height / 2]
+                [_this.getNodeCoordX(edge.startVirtualNode), _this.getNodeCoordY(edge.startVirtualNode) + _this.userGraph.bar_height / 2],
+                [_this.getNodeCoordX(edge.endVirtualNode), y + _this.userGraph.bar_height / 2]
               ])
             })
       }
@@ -317,16 +352,17 @@ export default {
         d3.select("#edge_" + edge.startVirtualNode.id + "-" + edge.endVirtualNode.id)
             .attr('d', () => {
               return line([
-                [_this.getNodeCoordX(edge.startVirtualNode), y + _this.graph.bar_height / 2],
-                [_this.getNodeCoordX(edge.endVirtualNode), _this.getNodeCoordY(edge.endVirtualNode) + _this.graph.bar_height / 2]
+                [_this.getNodeCoordX(edge.startVirtualNode), y + _this.userGraph.bar_height / 2],
+                [_this.getNodeCoordX(edge.endVirtualNode), _this.getNodeCoordY(edge.endVirtualNode) + _this.userGraph.bar_height / 2]
               ])
             })
       }
     },
 
-    checkOverlap() {
+    checkNodeOverlap() {
       for (let i = 0; i < this.userGraph.nodes.length; i++) {
         let node_1 = this.userGraph.nodes[i];
+
         for (let j = i + 1; j < this.userGraph.nodes.length; j++) {
           let node_2 = this.userGraph.nodes[j];
           let overlap_x = (node_2.startTime <= node_1.startTime && node_1.startTime < node_2.endTime)
@@ -345,8 +381,67 @@ export default {
       }
     },
 
+    getUserModifiedResult() {
+      // reset the virtual nodes' matrix
+      for (let i = 0; i < this.userGraph.virtualNodeIndex.length; i++) {
+        for (let j = 0; j < this.userGraph.virtualNodeIndex[i].length; j++) {
+          this.userGraph.virtualNodeIndex[i][j] = null;
+        }
+      }
+
+      // layout the virtual nodes of nodes to the position after modified
+      this.userGraph.nodes.forEach((node) => {
+        let layer = this.nodeLayerMap[node.id];
+        node.virtualNodes.forEach((virtualNode) => {
+          let index = virtualNode.tickRank;
+          virtualNode.userLayer = layer;
+          this.userGraph.virtualNodeIndex[index][layer] = virtualNode;
+        })
+      })
+
+      // layout the edge anchor nodes to the position after modified
+      let edgeAnchorNodes = this.userGraph.virtualNodes.filter((n) => n.nodeType === 'edge-anchor');
+      edgeAnchorNodes.forEach((edgeAnchorNode) => {
+        let index = edgeAnchorNode.tickRank;
+        this.userGraph.virtualNodeIndex[index][edgeAnchorNode.userLayer] = edgeAnchorNode;
+      })
+
+      // fill the virtual nodes' matrix
+      let anchorID = 0;
+      let spaceAnchorNodes = this.userGraph.virtualNodes.filter((n) => n.nodeType === 'anchor');
+      for (let i = 0; i < this.userGraph.virtualNodeIndex.length; i++) {
+        for (let j = 0; j < this.userGraph.virtualNodeIndex[i].length; j++) {
+          if (this.userGraph.virtualNodeIndex[i][j] == null) {
+            this.userGraph.virtualNodeIndex[i][j] = spaceAnchorNodes[anchorID++];
+          }
+        }
+      }
+    },
+
+    checkNodeEdgeOverlap() {
+      for (const node of this.userGraph.nodes) {
+        let layer = this.nodeLayerMap[node.id];
+        let startIndex = node.startVirtualNode.tickRank;
+        let endIndex = node.endVirtualNode.tickRank;
+        for (let i = startIndex; i <= endIndex; i++) {
+          let existVirtualNode = this.userGraph.virtualNodeIndex[i][layer];
+          if (existVirtualNode.nodeType === "edge-anchor") {
+            let message = "Node " + node.id + " and Edge Anchor " + existVirtualNode.id + " are overlapped.\n" + "Please avoid overlapping nodes and edges."
+            ElMessageBox.alert(message, 'Modification Failed', {
+              // if you want to disable its autofocus
+              // autofocus: false,
+              confirmButtonText: 'OK',
+            })
+            break;
+          }
+        }
+      }
+    },
+
     submitUserResult() {
-      this.checkOverlap()
+      this.checkNodeOverlap();
+      this.checkNodeEdgeOverlap();
+      this.getUserModifiedResult();
 
     }
   },

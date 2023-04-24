@@ -1,4 +1,4 @@
-export function calScore(graph, result) {
+export function calGurobiScore(graph, result) {
     let crossing_score = 0;
     let curvature_score = 0;
 
@@ -11,7 +11,7 @@ export function calScore(graph, result) {
             let v1 = u1v1.endVirtualNode;
 
             if (u1v1.edgeType === 'outer') {
-                curvature_score += calculateCurvatureScore(u1, v1, result);
+                curvature_score += calculateGurobiCurvatureScore(u1, v1, result);
             }
 
             for (let k = j + 1; k < layeredEdges.length; k++) {
@@ -34,8 +34,10 @@ export function calScore(graph, result) {
     return [crossing_score, curvature_score]
 }
 
-function calculateCurvatureScore(u1, v1, result) {
+function calculateGurobiCurvatureScore(u1, v1, result) {
     let curvature_variable = "z_" + u1.id + "_" + v1.id
 
     return result[curvature_variable]
 }
+
+
