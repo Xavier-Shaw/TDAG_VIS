@@ -15,6 +15,10 @@
         <el-input-number v-model="crossingWeight" :min="0"/>
         <span>Curvature Weight:</span>
         <el-input-number v-model="bendinessWeight" :min="0"/>
+        <span>Compactness Weight:</span>
+        <el-input-number v-model="compactnessWeight" :min="0"/>
+        <span>Vertical Position Weight:</span>
+        <el-input-number v-model="verticalPosWeight" :min="0"/>
       </el-row>
       <el-button style="width: 100px; align-self: center" type="primary" @click="setWeight">Set Weight</el-button>
       <el-button style="width: 100px; align-self: center" type="primary" @click="layout">Layout</el-button>
@@ -67,6 +71,8 @@ export default {
       nodeLayerMap: {},
       crossingWeight: 0,
       bendinessWeight: 0,
+      compactnessWeight: 0,
+      verticalPosWeight: 0,
       solver: null
     }
   },
@@ -91,7 +97,8 @@ export default {
                 this.solver = myAlgorithm;
                 this.crossingWeight = myAlgorithm.options.crossings_reduction_weight;
                 this.bendinessWeight = myAlgorithm.options.bendiness_reduction_weight;
-
+                this.compactnessWeight = myAlgorithm.options.compactness_reduction_weight;
+                this.verticalPosWeight = myAlgorithm.options.verticalPosition_reduction_weight;
                 this.graph.getVirtualGraph()
               }
           )
@@ -105,7 +112,9 @@ export default {
 
     setWeight() {
       this.solver.options.crossings_reduction_weight = this.crossingWeight;
-      this.solver.options.bendinessWeight = this.bendinessWeight;
+      this.solver.options.bendiness_reduction_weight = this.bendinessWeight;
+      this.solver.options.compactness_reduction_weight = this.compactnessWeight;
+      this.solver.options.verticalPosition_reduction_weight = this.verticalPosWeight;
     },
 
     layout() {
@@ -126,8 +135,9 @@ export default {
             this.graph.draw(svg_gantt, 30, true);
             let ilpEndTime = new Date();
             d3.select("#ILP_time").text("ILP Time:" + (ilpEndTime - ilpStartTime) / 1000 + 's');
-            let scores = calGurobiScore(this.graph, this.solver.result);
-            d3.select("#ILP_score").text("Crossing Score: " + scores[0] + " / Curvature Score: " + scores[1]);
+            let scores = calGurobiScore(this.solver);
+            d3.select("#ILP_score").text("Crossing Score: " + scores[0] + " / Curvature Score: " + scores[1]
+                + " / Compactness Score: " + scores[2] + " / Vertical Position Score: " + scores[3]);
             this.createUserGraph();
             this.drawDraggableChart();
           })
@@ -443,7 +453,8 @@ export default {
       this.checkNodeEdgeOverlap();
       this.getUserModifiedResult();
       let scores = calBasicScore(this.userGraph);
-      d3.select("#Modified_score").text("Crossing Score: " + scores[0] + " / Curvature Score: " + scores[1]);
+      d3.select("#Modified_score").text("Crossing Score: " + scores[0] + " / Curvature Score: " + scores[1]
+          + " / Compactness Score: " + scores[2] + " / Vertical Position Score: " + scores[3]);
     }
   },
 

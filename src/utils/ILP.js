@@ -16,6 +16,10 @@ export default class ILP {
             crossings_reduction_active: true,
             bendiness_reduction_weight: 1,
             bendiness_reduction_active: true,
+            compactness_reduction_weight: 1,
+            compactness_reduction_active: true,
+            verticalPosition_reduction_weight: 1,
+            verticalPosition_reduction_active: true
         };
     }
 
@@ -48,12 +52,6 @@ export default class ILP {
     makeCompactnessVariable(n1, n2) {
         let variable = "comp_g" + n1.groupID + "_g" + n2.groupID;
         this.compact_vars[variable] = "";
-        return variable;
-    }
-
-    makeHeightVariable(node) {
-        let variable = "y_" + node.id;
-        this.height_vars[variable] = "";
         return variable;
     }
 
@@ -135,7 +133,6 @@ export default class ILP {
     }
 
     addGroupToSubjectTo() {
-
         for (let i = 0; i < this.graph.virtualNodeIndex.length; i++) {
             let layerNodes = this.graph.virtualNodeIndex[i]
 
@@ -173,7 +170,6 @@ export default class ILP {
     }
 
     addLayerTransitivityToSubjectTo() {
-
         for (let i = 0; i < this.graph.virtualNodeIndex.length; i++) {
             let layerNodes = this.graph.virtualNodeIndex[i]
             for (let j = 0; j < layerNodes.length; j++) {
@@ -216,8 +212,16 @@ export default class ILP {
         }
     }
 
-    addVerticalPositionToSubjectTo() {
+    addCompactnessToMinimize() {
+        for (const elem in this.compact_vars) {
+            this.model.minimize += this.options.compactness_reduction_weight + " " + elem + " + ";
+        }
+    }
 
+    addVerticalPositionMinimize() {
+        for (const elem in this.group_vars) {
+            this.model.minimize += this.options.verticalPosition_reduction_weight + " " + elem + " + ";
+        }
     }
 
     modelToString() {
@@ -226,35 +230,34 @@ export default class ILP {
     }
 
     fillModel() {
-        this.minimizeString = "Minimize\n"
-        this.subjectString = "Subject To\n"
-        this.binaryString = "Binaries\n"
-        this.modelString = ""
+        this.model.minimize = "Minimize \n";
+        this.model.subjectTo = "Subject To \n";
+        this.model.bounds = "\nBinaries \n";
 
-        this.model.minimize = "Minimize \n"
-        this.model.subjectTo = "Subject To \n"
-        this.model.bounds = "\nBinaries \n"
+        this.crossing_vars = {};
+        this.defined_vars = {};
+        this.group_vars = {};
+        this.compact_vars = {};
+        this.bend_vars = {};
 
-        this.crossing_vars = {}
-        this.defined_vars = {}
-        this.group_vars = {}
-        this.compact_vars = {}
-        this.height_vars = {}
-        this.bend_vars = {}
+        // create variables and add them to subjection
+        this.addLayerTransitivityToSubjectTo();
+        this.addGroupToSubjectTo();
+        this.addCrossingsToSubjectTo();
+        this.addCompactnessToSubjectTo();
 
-        this.addLayerTransitivityToSubjectTo()
-        this.addGroupToSubjectTo()
-
-        this.addCrossingsToSubjectTo()
-        this.addCrossingsToMinimize()
-        this.addCurvatureToMinimize()
+        // add variables to objective function
+        this.addCrossingsToMinimize();
+        this.addCurvatureToMinimize();
+        this.addCompactnessToMinimize();
+        this.addVerticalPositionMinimize();
 
         // add binary constraints to variables
         for (let elem in this.defined_vars) {
-            this.model.bounds += elem + " "
+            this.model.bounds += elem + " ";
         }
         for (let elem in this.crossing_vars) {
-            this.model.bounds += elem + " "
+            this.model.bounds += elem + " ";
         }
     }
 

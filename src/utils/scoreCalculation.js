@@ -1,64 +1,75 @@
 // ====================== Calculate Gurobi Result ==========================
-export function calGurobiScore(graph, result) {
+export function calGurobiScore(solver) {
     let scores = [];
 
-    let temp_scores = calGurobiCrossingScore(graph, result);
-    for (const score of temp_scores) {
-        scores.push(score);
-    }
+    let crossingScore = calGurobiCrossingScore(solver);
+    scores.push(crossingScore);
+
+    let curvatureScore = calGurobiCurvatureScore(solver);
+    scores.push(curvatureScore);
+
+    let compactnessScore = calGurobiCompactnessScore(solver);
+    scores.push(compactnessScore);
+
+    let verticalPositionScore = calGurobiVerticalPositionScore(solver);
+    scores.push(verticalPositionScore);
 
     return scores;
 }
 
-function calGurobiCrossingScore(graph, result) {
-    let crossingScore = 0, curvatureScore = 0;
-    for (let i = 0; i < graph.virtualNodeIndex.length; i++) {
-        let layeredEdges = graph.virtualEdges.filter(e => e.startVirtualNode.tickRank === i)
+function calGurobiCrossingScore(solver) {
+    let crossingScore = 0;
+    for (const crossingVar in solver.crossing_vars) {
+        crossingScore += solver.result[crossingVar];
+    }
 
-        for (let j = 0; j < layeredEdges.length; j++) {
-            let u1v1 = layeredEdges[j];
-            let u1 = u1v1.startVirtualNode;
-            let v1 = u1v1.endVirtualNode;
+    return crossingScore;
+}
 
-            if (u1v1.edgeType === 'outer') {
-                curvatureScore += calGurobiCurvatureScore(u1, v1, result);
-            }
+function calGurobiCurvatureScore(solver) {
+    let curvatureScore = 0;
+    for (const bendVar in solver.bend_vars) {
+        curvatureScore += solver.result[bendVar];
+    }
 
-            for (let k = j + 1; k < layeredEdges.length; k++) {
-                let u2v2 = layeredEdges[k];
-                let u2 = u2v2.startVirtualNode;
-                let v2 = u2v2.endVirtualNode;
+    return curvatureScore;
+}
 
-                if (u1.id === u2.id || v1.id === v2.id || u1.id === v2.id || u2.id === v1.id) {
-                    continue;
-                }
+function calGurobiCompactnessScore(solver) {
+    let compactnessScore = 0;
+    for (const compVar in solver.compact_vars) {
+        compactnessScore += solver.result[compVar];
+    }
 
-                let crossing_variable = "cross_" + u1.id  + "_" + v1.id + "_" + u2.id + "_" + v2.id;
-                let crossing_res = result[crossing_variable];
+    return compactnessScore;
+}
 
-                crossingScore += crossing_res;
-            }
+function calGurobiVerticalPositionScore(solver) {
+    let verticalPositionScore = 0;
+    for (const groupVar in solver.group_vars) {
+        // not consider edge anchor
+        if (!groupVar.includes("ea")) {
+            verticalPositionScore += solver.result[groupVar];
         }
     }
 
-    return [crossingScore, curvatureScore];
+    return verticalPositionScore;
 }
-
-function calGurobiCurvatureScore(u1, v1, result) {
-    let curvature_variable = "z_" + u1.id + "_" + v1.id;
-
-    return result[curvature_variable];
-}
-
 
 // =========================== Calculate User Graph ===========================
 export function calBasicScore(graph) {
     let scores = [];
 
-    let temp_scores = calBasicCrossingScore(graph);
-    for (const score of temp_scores) {
+    let cross_curve_scores = calBasicCrossingScore(graph);
+    for (const score of cross_curve_scores) {
         scores.push(score);
     }
+
+    let compact_score = calBasicCompactnessScore(graph);
+    scores.push(compact_score);
+
+    let verticalPos_score = calBasicVerticalPositionScore(graph);
+    scores.push(verticalPos_score);
 
     return scores;
 }
@@ -99,3 +110,33 @@ function calBasicCurvatureScore(u1, v1) {
     let delta = u1.userLayer - v1.userLayer;
     return Math.abs(delta);
 }
+
+function calBasicCompactnessScore(graph) {
+    let compactnessScore = 0;
+    for (let i = 0; i < graph.nodes.length; i++) {
+        let node_1 = graph.nodes[i];
+        let startIndex_1 = node_1.startVirtualNode.tickRank;
+        let endIndex_1 = node_1.endVirtualNode.tickRank;
+        for (let j = i + 1; j < graph.nodes.length; j++) {
+            let node_2 = graph.nodes[j];
+            let startIndex_2 = node_2.startVirtualNode.tickRank;
+            let endIndex_2 = node_2.endVirtualNode.tickRank;
+            if (startIndex_1 <= startIndex_2 <= endIndex_1 || startIndex_1 <= endIndex_2 <= endIndex_1) {
+                compactnessScore += Math.abs(node_1.startVirtualNode.userLayer - node_2.startVirtualNode.userLayer);
+            }
+        }
+    }
+
+    return compactnessScore;
+}
+
+function calBasicVerticalPositionScore(graph) {
+    let verticalPositionScore = 0;
+    for (let i = 0; i < graph.nodes.length; i++) {
+        let node = graph.nodes[i];
+        verticalPositionScore += node.startVirtualNode.userLayer;
+    }
+
+    return verticalPositionScore;
+}
+
