@@ -17,11 +17,24 @@
         <el-input-number v-model="bendinessWeight" :min="0"/>
         <span>Compactness Weight:</span>
         <el-input-number v-model="compactnessWeight" :min="0"/>
+      </el-row>
+      <el-row style="align-self: center" :gutter="20">
+        <span>Vertical Position:</span>
+        <el-select v-model="verticalPosition">
+          <el-option
+              v-for="op in verticalPositionOptions"
+              :key="op.value"
+              :label="op.label"
+              :value="op.value"
+          />
+        </el-select>
         <span>Vertical Position Weight:</span>
         <el-input-number v-model="verticalPosWeight" :min="0"/>
       </el-row>
-      <el-button style="width: 100px; align-self: center" type="primary" @click="setWeight">Set Weight</el-button>
-      <el-button style="width: 100px; align-self: center" type="primary" @click="layout">Layout</el-button>
+      <div style="display: flex; align-self: center">
+        <el-button style="width: 100px; align-self: center" type="primary" @click="setWeight">Set Weight</el-button>
+        <el-button style="width: 100px; align-self: center" type="primary" @click="layout">Layout</el-button>
+      </div>
     </div>
 
     <h2>ILP Gantt Graph</h2>
@@ -73,7 +86,26 @@ export default {
       bendinessWeight: 0,
       compactnessWeight: 0,
       verticalPosWeight: 0,
-      solver: null
+      solver: null,
+      verticalPosition: 'Null',
+      verticalPositionOptions: [
+        {
+          value: 'Null',
+          label: 'Null'
+        },
+        {
+          value: 'Top',
+          label: 'Top'
+        },
+        {
+          value: 'Middle',
+          label: 'Middle'
+        },
+        {
+          value: 'Bottom',
+          label: 'Bottom'
+        }
+      ]
     }
   },
 
@@ -114,6 +146,7 @@ export default {
       this.solver.options.crossings_reduction_weight = this.crossingWeight;
       this.solver.options.bendiness_reduction_weight = this.bendinessWeight;
       this.solver.options.compactness_reduction_weight = this.compactnessWeight;
+      this.solver.options.verticalPosition_reduction_option = this.verticalPosition;
       this.solver.options.verticalPosition_reduction_weight = this.verticalPosWeight;
     },
 
@@ -140,6 +173,7 @@ export default {
                 + " / Compactness Score: " + scores[2] + " / Vertical Position Score: " + scores[3]);
             this.createUserGraph();
             this.drawDraggableChart();
+            this.calUserResult();
           })
     },
 
@@ -229,6 +263,7 @@ export default {
                 .attr('fill', node_colors[node.nodeType])
 
             svg.append('text')
+                .attr("class", "node-text")
                 .attr("id", "text_" + node.id)
                 .text(node.id)
                 .attr('text-anchor', 'middle')
@@ -258,6 +293,7 @@ export default {
               let text = node.realNode.name.replace('Map ', 'M')
               text = text.replace('Reducer ', 'R')
               svg.append('text')
+                  .attr("class", "node-text")
                   .attr("id", "text_" + node.realNode.id)
                   .text(text)
                   .attr('text-anchor', 'middle')
@@ -274,6 +310,8 @@ export default {
 
       d3.selectAll(".draggableItem")
           .call(_this.dragItem())
+
+
     },
 
     dragItem() {
@@ -452,7 +490,11 @@ export default {
       this.checkNodeOverlap();
       this.checkNodeEdgeOverlap();
       this.getUserModifiedResult();
-      let scores = calBasicScore(this.userGraph);
+      this.calUserResult();
+    },
+
+    calUserResult() {
+      let scores = calBasicScore(this.userGraph, this.solver);
       d3.select("#Modified_score").text("Crossing Score: " + scores[0] + " / Curvature Score: " + scores[1]
           + " / Compactness Score: " + scores[2] + " / Vertical Position Score: " + scores[3]);
     }
@@ -465,9 +507,19 @@ export default {
 </script>
 
 <style scoped>
+.el-select {
+  margin-left: 10px;
+  margin-right: 30px;
+  margin-bottom: 20px;
+}
+
 .el-input-number {
   margin-left: 10px;
   margin-right: 30px;
   margin-bottom: 20px;
+}
+
+.node-text {
+  user-select: none;
 }
 </style>

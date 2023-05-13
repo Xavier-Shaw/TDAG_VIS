@@ -46,10 +46,13 @@ function calGurobiCompactnessScore(solver) {
 
 function calGurobiVerticalPositionScore(solver) {
     let verticalPositionScore = 0;
-    for (const groupVar in solver.group_vars) {
-        // not consider edge anchor
-        if (!groupVar.includes("ea")) {
-            verticalPositionScore += solver.result[groupVar];
+    let position = solver.options.verticalPosition;
+    if (position !== -1) {
+        for (const groupVar in solver.group_vars) {
+            // not consider edge anchor
+            if (!groupVar.includes("ea")) {
+                verticalPositionScore += Math.abs(solver.result[groupVar] - position);
+            }
         }
     }
 
@@ -57,7 +60,7 @@ function calGurobiVerticalPositionScore(solver) {
 }
 
 // =========================== Calculate User Graph ===========================
-export function calBasicScore(graph) {
+export function calBasicScore(graph, solver) {
     let scores = [];
 
     let cross_curve_scores = calBasicCrossingScore(graph);
@@ -68,7 +71,7 @@ export function calBasicScore(graph) {
     let compact_score = calBasicCompactnessScore(graph);
     scores.push(compact_score);
 
-    let verticalPos_score = calBasicVerticalPositionScore(graph);
+    let verticalPos_score = calBasicVerticalPositionScore(graph, solver);
     scores.push(verticalPos_score);
 
     return scores;
@@ -130,11 +133,14 @@ function calBasicCompactnessScore(graph) {
     return compactnessScore;
 }
 
-function calBasicVerticalPositionScore(graph) {
+function calBasicVerticalPositionScore(graph, solver) {
     let verticalPositionScore = 0;
-    for (let i = 0; i < graph.nodes.length; i++) {
-        let node = graph.nodes[i];
-        verticalPositionScore += node.startVirtualNode.userLayer;
+    let position = solver.options.verticalPosition;
+    if (position !== -1) {
+        for (let i = 0; i < graph.nodes.length; i++) {
+            let node = graph.nodes[i];
+            verticalPositionScore += Math.abs(position - node.startVirtualNode.userLayer);
+        }
     }
 
     return verticalPositionScore;

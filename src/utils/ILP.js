@@ -18,6 +18,8 @@ export default class ILP {
             bendiness_reduction_active: true,
             compactness_reduction_weight: 1,
             compactness_reduction_active: true,
+            verticalPosition_reduction_option: 'Null',
+            verticalPosition: -1,
             verticalPosition_reduction_weight: 1,
             verticalPosition_reduction_active: true
         };
@@ -58,6 +60,12 @@ export default class ILP {
     makeCurveVariable(u1, v1) {
         let variable = "z_" + u1.id + "_" + v1.id;
         this.bend_vars[variable] = "";
+        return variable;
+    }
+
+    makeVerticalVariable(group_var) {
+        let variable = "v_" + group_var;
+        this.vertical_vars[variable] = "";
         return variable;
     }
 
@@ -218,9 +226,36 @@ export default class ILP {
         }
     }
 
-    addVerticalPositionMinimize() {
+    addVerticalPositionToSubjectTo() {
+        switch (this.options.verticalPosition_reduction_option) {
+            case "Null":
+                this.options.verticalPosition = -1;
+                this.options.verticalPosition_reduction_weight = 0;
+                break;
+            case "Top":
+                this.options.verticalPosition = 0;
+                break;
+            case "Middle":
+                this.options.verticalPosition = Math.floor(this.graph.MAX_INDEX / 2);
+                break;
+            case "Bottom":
+                this.options.verticalPosition = this.graph.MAX_INDEX - 1;
+                break;
+        }
+        if (this.options.verticalPosition === -1) {
+            return;
+        }
+
         for (const elem in this.group_vars) {
-            this.model.minimize += this.options.verticalPosition_reduction_weight + " " + elem + " + ";
+            let verticalVar = this.makeVerticalVariable(elem);
+            this.model.subjectTo += elem + " - " + verticalVar + " <= " + this.options.verticalPosition + "\n";
+            this.model.subjectTo += elem + " + " + verticalVar + " >= " + this.options.verticalPosition + "\n";
+        }
+    }
+
+    addVerticalPositionToMinimize() {
+        for (const elem in this.vertical_vars) {
+          this.model.minimize += this.options.verticalPosition_reduction_weight + " " + elem + " + ";
         }
     }
 
@@ -239,18 +274,20 @@ export default class ILP {
         this.group_vars = {};
         this.compact_vars = {};
         this.bend_vars = {};
+        this.vertical_vars = {};
 
         // create variables and add them to subjection
         this.addLayerTransitivityToSubjectTo();
         this.addGroupToSubjectTo();
         this.addCrossingsToSubjectTo();
         this.addCompactnessToSubjectTo();
+        this.addVerticalPositionToSubjectTo();
 
         // add variables to objective function
         this.addCrossingsToMinimize();
         this.addCurvatureToMinimize();
         this.addCompactnessToMinimize();
-        this.addVerticalPositionMinimize();
+        this.addVerticalPositionToMinimize();
 
         // add binary constraints to variables
         for (let elem in this.defined_vars) {
@@ -259,6 +296,8 @@ export default class ILP {
         for (let elem in this.crossing_vars) {
             this.model.bounds += elem + " ";
         }
+
+        console.log("MIP Model:", JSON.stringify(this.model));
     }
 
     arrange() {
